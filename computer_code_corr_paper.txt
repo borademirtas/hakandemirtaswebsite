@@ -1,0 +1,486 @@
+# This code can be used to replicate the results
+# Load the necessary libraries
+library(corpcor)
+
+############################################################################
+biv.function<-function(datavector1, datavector2, desired.cor, pearson=TRUE, 
+spearman=FALSE)  {
+#create a bivariate dataset with desired correlation input
+#datavetor1=marginal distribution 1
+#datavetor2=marginal distribution 2
+#desired.cor=desired correlation for dataset
+#pearson=want pearson correlation, default is TRUE
+#spearman=want spearman correlation, default is FALSE
+  
+  if(desired.cor==0) {
+    stop('Induced correlation cannot be 0!')
+  }
+  if(length(datavector1)!=length(datavector2)) {
+    stop('datavector1 and datavector2 must be the same length!')
+  }
+  if(length(datavector1)<100000) {
+    stop('Data must have at least 100,000 observations for finding the correlation bounds accurately!')
+  }
+  if(pearson==TRUE & spearman==TRUE | pearson==FALSE & spearman==FALSE) {
+    stop('Either specify Pearson or Spearman correlation, but not both!')
+  }
+  
+  N<-length(datavector1)
+  
+  UB.dat<-cbind(sort(datavector1), sort(datavector2))
+  LB.dat<-cbind(sort(datavector1), sort(datavector2, decreasing=TRUE))
+  
+  if(pearson==TRUE) {
+    LB<-cor(LB.dat)[1,2]
+    UB<-cor(UB.dat)[1,2]
+  } else if(spearman==TRUE) {
+    LB<-cor(LB.dat, method='spearman')[1,2]
+    UB<-cor(UB.dat, method='spearman')[1,2]    
+  }
+  
+  
+if(desired.cor>UB | desired.cor<LB) {
+ stop('Desired correlation is not within feasible correlation bounds for data!')
+  }
+  
+  if(desired.cor>0) {
+    sort.perc<-desired.cor/UB
+    Nsort<-ceiling(N*sort.perc)
+    
+    new.dat<-rbind(cbind(sort(datavector1[1:Nsort]), sort(datavector2[1:Nsort])),
+                   cbind(datavector1[(Nsort+1):N], datavector2[(Nsort+1):N]))
+    
+  } else if(desired.cor<0) {
+    sort.perc<-desired.cor/LB
+    Nsort<-ceiling(N*sort.perc)
+new.dat<-rbind(cbind(sort(datavector1[1:Nsort]), sort(datavector2[1:Nsort], 
+decreasing=TRUE)),
+                   cbind(datavector1[(Nsort+1):N], datavector2[(Nsort+1):N]))
+  }
+  
+  if(pearson==TRUE) {
+    emp.cor<-paste0(round(cor(new.dat, method='pearson')[1,2],4))
+    cor.type<-'Pearson'
+  } else if(spearman==TRUE) {
+    emp.cor<-paste0(round(cor(new.dat, method='spearman')[1,2],4))
+    cor.type<-'Spearman'
+  }
+  
+print(paste0('Bounds=(', paste(round(c(LB, UB), 4), 
+collapse=','), '), Desired Cor=', desired.cor, ', Empirical Cor=', emp.cor))
+  
+  return(list(new.dat=data.frame(new.dat),
+              bounds=c(LB, UB),
+              cor.type=cor.type,
+              desired.cor=desired.cor,
+              empirical.cor=emp.cor))
+}
+###############################################
+#Illustration part (Results are presented in Section 2)
+N=1000000
+set.seed(549)
+#Normal=N(0,1), Exponential=Exp(1)
+#Bernoulli=Bern(0.8), Poisson=Pois(2), 
+#Ordinal=(1,2,3,4), c(0.4,0.3,0.2,0.1)
+
+#1) P-B
+mydata.pb1.pears=biv.function(rpois(N,2),sample(c(0,1),N,replace=T,prob=c(0.2,0.8)), 
+desired.cor=0.3, pearson=TRUE,spearman=FALSE)
+#[1] "Bounds=(-0.7389,0.5924), Desired Cor=0.3, Empirical Cor=0.3008"
+mydata.pb2.pears=biv.function(rpois(N,2),sample(c(0,1),N,replace=T,prob=c(0.2,0.8)), 
+desired.cor=-0.5, pearson=TRUE,spearman=FALSE)
+#[1] "Bounds=(-0.7393,0.5929), Desired Cor=-0.5, Empirical Cor=-0.4996"
+mydata.pb1.spear=biv.function(rpois(N,2),sample(c(0,1),N,replace=T,prob=c(0.2,0.8)), 
+desired.cor=0.2, pearson=FALSE,spearman=TRUE)
+#[1] "Bounds=(-0.68,0.6521), Desired Cor=0.2, Empirical Cor=0.2007"
+mydata.pb2.spear=biv.function(rpois(N,2),sample(c(0,1),N,replace=T,prob=c(0.2,0.8)), 
+desired.cor=-0.6, pearson=FALSE,spearman=TRUE)
+#[1] "Bounds=(-0.6793,0.6514), Desired Cor=-0.6, Empirical Cor=-0.6"
+#2) N-O 
+mydata.no1.pears=biv.function(rnorm(N),sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=0.8, pearson=TRUE, spearman=FALSE)
+#[1] "Bounds=(-0.9095,0.9093), Desired Cor=0.8, Empirical Cor=0.8001"
+mydata.no2.pears=biv.function(rnorm(N),sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=-0.7, pearson=TRUE, spearman=FALSE)
+#[1] "Bounds=(-0.9096,0.9093), Desired Cor=-0.7, Empirical Cor=-0.6992"
+mydata.no1.spear=biv.function(rnorm(N),sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=0.6, pearson=FALSE, spearman=TRUE)
+#[1] "Bounds=(-0.9488,0.9488), Desired Cor=0.6, Empirical Cor=0.6003"
+mydata.no2.spear=biv.function(rnorm(N),sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=-0.4, pearson=FALSE, spearman=TRUE)
+#[1] "Bounds=(-0.9487,0.9487), Desired Cor=-0.4, Empirical Cor=-0.4007"
+#3) P-B with small parameter values 
+set.seed(231)
+mydata.pb3.pears=biv.function(rpois(N,0.009),sample(c(0,1),N,replace=T,prob=c(0.999,0.001)), 
+desired.cor=0.2, pearson=TRUE,spearman=FALSE)
+#[1] "Bounds=(-0.0031,0.3512), Desired Cor=0.2, Empirical Cor=0.1991"
+set.seed(756)
+mydata.pb3.spear=biv.function(rpois(N,0.009),sample(c(0,1),N,replace=T,prob=c(0.999,0.001)), 
+desired.cor=0.1, pearson=FALSE,spearman=TRUE)
+#[1] "Bounds=(-0.003,0.3347), Desired Cor=0.1, Empirical Cor=0.1003"
+###################################################################
+#Generate Table 1
+#Results for the above two combinations are in the text, the rest is reported in Table 1.
+N=1000000
+set.seed(8242001)
+#1) N-B
+mydata.nb1.pears=biv.function(rnorm(N),sample(c(0,1),N,replace=T,prob=c(0.2,0.8)), 
+desired.cor=0.5, pearson=TRUE, spearman=FALSE)
+mydata.nb2.pears=biv.function(rnorm(N),sample(c(0,1),N,replace=T,prob=c(0.2,0.8)), 
+desired.cor=-0.3, pearson=TRUE, spearman=FALSE)
+mydata.nb1.spear=biv.function(rnorm(N),sample(c(0,1),N,replace=T,prob=c(0.2,0.8)), 
+desired.cor=0.2, pearson=FALSE, spearman=TRUE)
+mydata.nb2.spear=biv.function(rnorm(N),sample(c(0,1),N,replace=T,prob=c(0.2,0.8)), 
+desired.cor=-0.6, pearson=FALSE, spearman=TRUE)
+#2) N-P
+mydata.np1.pears=biv.function(rnorm(N),rpois(N,2), 
+desired.cor=0.9, pearson=TRUE, spearman=FALSE)
+mydata.np2.pears=biv.function(rnorm(N),rpois(N,2), 
+desired.cor=-0.4, pearson=TRUE, spearman=FALSE)
+mydata.np1.spear=biv.function(rnorm(N),rpois(N,2), 
+desired.cor=0.1, pearson=FALSE, spearman=TRUE)
+mydata.np2.spear=biv.function(rnorm(N),rpois(N,2), 
+desired.cor=-0.8, pearson=FALSE, spearman=TRUE)
+#3) N-E
+mydata.ne1.pears=biv.function(rnorm(N),rexp(N,1), 
+desired.cor=0.7, pearson=TRUE, spearman=FALSE)
+mydata.ne2.pears=biv.function(rnorm(N),rexp(N,1), 
+desired.cor=-0.5, pearson=TRUE, spearman=FALSE)
+mydata.ne1.spear=biv.function(rnorm(N),rexp(N,1), 
+desired.cor=0.1, pearson=FALSE, spearman=TRUE)
+mydata.ne2.spear=biv.function(rnorm(N),rexp(N,1), 
+desired.cor=-0.6, pearson=FALSE, spearman=TRUE)
+#4) E-B
+mydata.eb1.pears=biv.function(rexp(N,1),sample(c(0,1),N,replace=T,prob=c(0.2,0.8)), 
+desired.cor=0.4, pearson=TRUE, spearman=FALSE)
+mydata.eb2.pears=biv.function(rexp(N,1),sample(c(0,1),N,replace=T,prob=c(0.2,0.8)), 
+desired.cor=-0.3, pearson=TRUE, spearman=FALSE)
+mydata.eb1.spear=biv.function(rexp(N,1),sample(c(0,1),N,replace=T,prob=c(0.2,0.8)), 
+desired.cor=0.5, pearson=FALSE, spearman=TRUE)
+mydata.eb2.spear=biv.function(rexp(N,1),sample(c(0,1),N,replace=T,prob=c(0.2,0.8)), 
+desired.cor=-0.2, pearson=FALSE, spearman=TRUE)
+#5) E-P
+mydata.ep1.pears=biv.function(rexp(N,1),rpois(N,2), 
+desired.cor=0.9, pearson=TRUE, spearman=FALSE)
+mydata.ep2.pears=biv.function(rexp(N,1),rpois(N,2), 
+desired.cor=-0.7, pearson=TRUE, spearman=FALSE)
+mydata.ep1.spear=biv.function(rexp(N,1),rpois(N,2), 
+desired.cor=0.8, pearson=FALSE, spearman=TRUE)
+mydata.ep2.spear=biv.function(rexp(N,1),rpois(N,2), 
+desired.cor=-0.5, pearson=FALSE, spearman=TRUE)
+#6) E-O
+mydata.eo1.pears=biv.function(rexp(N,1),sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=0.6, pearson=TRUE, spearman=FALSE)
+mydata.eo2.pears=biv.function(rexp(N,1),sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=-0.5, pearson=TRUE, spearman=FALSE)
+mydata.eo1.spear=biv.function(rexp(N,1),sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=0.3, pearson=FALSE, spearman=TRUE)
+mydata.eo2.spear=biv.function(rexp(N,1),sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=-0.8, pearson=FALSE, spearman=TRUE)
+#7) B-O
+mydata.bo1.pears=biv.function(sample(c(0,1),N,replace=T,prob=c(0.2,0.8)),
+sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=0.1, pearson=TRUE, spearman=FALSE)
+mydata.bo2.pears=biv.function(sample(c(0,1),N,replace=T,prob=c(0.2,0.8)),
+sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=-0.4, pearson=TRUE, spearman=FALSE)
+mydata.bo1.spear=biv.function(sample(c(0,1),N,replace=T,prob=c(0.2,0.8)),
+sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=0.2, pearson=FALSE, spearman=TRUE)
+mydata.bo2.spear=biv.function(sample(c(0,1),N,replace=T,prob=c(0.2,0.8)),
+sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=-0.3, pearson=FALSE, spearman=TRUE)
+#8) P-O
+mydata.po1.pears=biv.function(rpois(N,2),
+sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=0.7, pearson=TRUE, spearman=FALSE)
+mydata.po2.pears=biv.function(rpois(N,2),
+sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=-0.8, pearson=TRUE, spearman=FALSE)
+mydata.po1.spear=biv.function(rpois(N,2),
+sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=0.6, pearson=FALSE, spearman=TRUE)
+mydata.po2.spear=biv.function(rpois(N,2),
+sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=-0.9, pearson=FALSE, spearman=TRUE)
+#9) P-P
+mydata.pp1.pears=biv.function(rpois(N,2),rpois(N,2), 
+desired.cor=0.5, pearson=TRUE, spearman=FALSE)
+mydata.pp2.pears=biv.function(rpois(N,2),rpois(N,2), 
+desired.cor=-0.4, pearson=TRUE, spearman=FALSE)
+mydata.pp1.spear=biv.function(rpois(N,2),rpois(N,2), 
+desired.cor=0.9, pearson=FALSE, spearman=TRUE)
+mydata.pp2.spear=biv.function(rpois(N,2),rpois(N,2), 
+desired.cor=-0.7, pearson=FALSE, spearman=TRUE)
+#10) O-O
+mydata.oo1.pears=biv.function(sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)),
+sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=0.4, pearson=TRUE, spearman=FALSE)
+mydata.oo2.pears=biv.function(sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)),
+sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=-0.2, pearson=TRUE, spearman=FALSE)
+mydata.oo1.spear=biv.function(sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)),
+sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=0.6, pearson=FALSE, spearman=TRUE)
+mydata.oo2.spear=biv.function(sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)),
+sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=-0.8, pearson=FALSE, spearman=TRUE)
+#############################################################
+# For each of ten combinations, there are four rows in Table 1
+# The first two columns denote the distributional forms, then the next five columns are
+  "cor.type",  "bounds", "desired.cor", "sort.ratio",  and "empirical.cor"
+
+res.mat=matrix(0,40,5)
+res.mat[1,]=round(as.numeric(c(mydata.nb1.pears$bounds[1],mydata.nb1.pears$bounds[2],
+mydata.nb1.pears$desired.cor,mydata.nb1.pears$desired.cor/mydata.nb1.pears$bounds[2],
+mydata.nb1.pears$empirical.cor)),4)
+res.mat[2,]=round(as.numeric(c(mydata.nb2.pears$bounds[1],mydata.nb2.pears$bounds[2],
+mydata.nb2.pears$desired.cor,mydata.nb2.pears$desired.cor/mydata.nb2.pears$bounds[1],
+mydata.nb2.pears$empirical.cor)),4)
+res.mat[3,]=round(as.numeric(c(mydata.nb1.spear$bounds[1],mydata.nb1.spear$bounds[2],
+mydata.nb1.spear$desired.cor,mydata.nb1.spear$desired.cor/mydata.nb1.spear$bounds[2],
+mydata.nb1.spear$empirical.cor)),4)
+res.mat[4,]=round(as.numeric(c(mydata.nb2.spear$bounds[1],mydata.nb2.spear$bounds[2],
+mydata.nb2.spear$desired.cor,mydata.nb2.spear$desired.cor/mydata.nb2.spear$bounds[1],
+mydata.nb2.spear$empirical.cor)),4)
+res.mat[5,]=round(as.numeric(c(mydata.np1.pears$bounds[1],mydata.np1.pears$bounds[2],
+mydata.np1.pears$desired.cor,mydata.np1.pears$desired.cor/mydata.np1.pears$bounds[2],
+mydata.np1.pears$empirical.cor)),4)
+res.mat[6,]=round(as.numeric(c(mydata.np2.pears$bounds[1],mydata.np2.pears$bounds[2],
+mydata.np2.pears$desired.cor,mydata.np2.pears$desired.cor/mydata.np2.pears$bounds[1],
+mydata.np2.pears$empirical.cor)),4)
+res.mat[7,]=round(as.numeric(c(mydata.np1.spear$bounds[1],mydata.np1.spear$bounds[2],
+mydata.np1.spear$desired.cor,mydata.np1.spear$desired.cor/mydata.np1.spear$bounds[2],
+mydata.np1.spear$empirical.cor)),4)
+res.mat[8,]=round(as.numeric(c(mydata.np2.spear$bounds[1],mydata.np2.spear$bounds[2],
+mydata.np2.spear$desired.cor,mydata.np2.spear$desired.cor/mydata.np2.spear$bounds[1],
+mydata.np2.spear$empirical.cor)),4)
+res.mat[9,]=round(as.numeric(c(mydata.ne1.pears$bounds[1],mydata.ne1.pears$bounds[2],
+mydata.ne1.pears$desired.cor,mydata.ne1.pears$desired.cor/mydata.ne1.pears$bounds[2],
+mydata.ne1.pears$empirical.cor)),4)
+res.mat[10,]=round(as.numeric(c(mydata.ne2.pears$bounds[1],mydata.ne2.pears$bounds[2],
+mydata.ne2.pears$desired.cor,mydata.ne2.pears$desired.cor/mydata.ne2.pears$bounds[1],
+mydata.ne2.pears$empirical.cor)),4)
+res.mat[11,]=round(as.numeric(c(mydata.ne1.spear$bounds[1],mydata.ne1.spear$bounds[2],
+mydata.ne1.spear$desired.cor,mydata.ne1.spear$desired.cor/mydata.ne1.spear$bounds[2],
+mydata.ne1.spear$empirical.cor)),4)
+res.mat[12,]=round(as.numeric(c(mydata.ne2.spear$bounds[1],mydata.ne2.spear$bounds[2],
+mydata.ne2.spear$desired.cor,mydata.ne2.spear$desired.cor/mydata.ne2.spear$bounds[1],
+mydata.ne2.spear$empirical.cor)),4)
+res.mat[13,]=round(as.numeric(c(mydata.eb1.pears$bounds[1],mydata.eb1.pears$bounds[2],
+mydata.eb1.pears$desired.cor,mydata.eb1.pears$desired.cor/mydata.eb1.pears$bounds[2],
+mydata.eb1.pears$empirical.cor)),4)
+res.mat[14,]=round(as.numeric(c(mydata.eb2.pears$bounds[1],mydata.eb2.pears$bounds[2],
+mydata.eb2.pears$desired.cor,mydata.eb2.pears$desired.cor/mydata.eb2.pears$bounds[1],
+mydata.eb2.pears$empirical.cor)),4)
+res.mat[15,]=round(as.numeric(c(mydata.eb1.spear$bounds[1],mydata.eb1.spear$bounds[2],
+mydata.eb1.spear$desired.cor,mydata.eb1.spear$desired.cor/mydata.eb1.spear$bounds[2],
+mydata.eb1.spear$empirical.cor)),4)
+res.mat[16,]=round(as.numeric(c(mydata.eb2.spear$bounds[1],mydata.eb2.spear$bounds[2],
+mydata.eb2.spear$desired.cor,mydata.eb2.spear$desired.cor/mydata.eb2.spear$bounds[1],
+mydata.eb2.spear$empirical.cor)),4)
+res.mat[17,]=round(as.numeric(c(mydata.ep1.pears$bounds[1],mydata.ep1.pears$bounds[2],
+mydata.ep1.pears$desired.cor,mydata.ep1.pears$desired.cor/mydata.ep1.pears$bounds[2],
+mydata.ep1.pears$empirical.cor)),4)
+res.mat[18,]=round(as.numeric(c(mydata.ep2.pears$bounds[1],mydata.ep2.pears$bounds[2],
+mydata.ep2.pears$desired.cor,mydata.ep2.pears$desired.cor/mydata.ep2.pears$bounds[1],
+mydata.ep2.pears$empirical.cor)),4)
+res.mat[19,]=round(as.numeric(c(mydata.ep1.spear$bounds[1],mydata.ep1.spear$bounds[2],
+mydata.ep1.spear$desired.cor,mydata.ep1.spear$desired.cor/mydata.ep1.spear$bounds[2],
+mydata.ep1.spear$empirical.cor)),4)
+res.mat[20,]=round(as.numeric(c(mydata.ep2.spear$bounds[1],mydata.ep2.spear$bounds[2],
+mydata.ep2.spear$desired.cor,mydata.ep2.spear$desired.cor/mydata.ep2.spear$bounds[1],
+mydata.ep2.spear$empirical.cor)),4)
+res.mat[21,]=round(as.numeric(c(mydata.eo1.pears$bounds[1],mydata.eo1.pears$bounds[2],
+mydata.eo1.pears$desired.cor,mydata.eo1.pears$desired.cor/mydata.eo1.pears$bounds[2],
+mydata.eo1.pears$empirical.cor)),4)
+res.mat[22,]=round(as.numeric(c(mydata.eo2.pears$bounds[1],mydata.eo2.pears$bounds[2],
+mydata.eo2.pears$desired.cor,mydata.eo2.pears$desired.cor/mydata.eo2.pears$bounds[1],
+mydata.eo2.pears$empirical.cor)),4)
+res.mat[23,]=round(as.numeric(c(mydata.eo1.spear$bounds[1],mydata.eo1.spear$bounds[2],
+mydata.eo1.spear$desired.cor,mydata.eo1.spear$desired.cor/mydata.eo1.spear$bounds[2],
+mydata.eo1.spear$empirical.cor)),4)
+res.mat[24,]=round(as.numeric(c(mydata.eo2.spear$bounds[1],mydata.eo2.spear$bounds[2],
+mydata.eo2.spear$desired.cor,mydata.eo2.spear$desired.cor/mydata.eo2.spear$bounds[1],
+mydata.eo2.spear$empirical.cor)),4)
+res.mat[25,]=round(as.numeric(c(mydata.bo1.pears$bounds[1],mydata.bo1.pears$bounds[2],
+mydata.bo1.pears$desired.cor,mydata.bo1.pears$desired.cor/mydata.bo1.pears$bounds[2],
+mydata.bo1.pears$empirical.cor)),4)
+res.mat[26,]=round(as.numeric(c(mydata.bo2.pears$bounds[1],mydata.bo2.pears$bounds[2],
+mydata.bo2.pears$desired.cor,mydata.bo2.pears$desired.cor/mydata.bo2.pears$bounds[1],
+mydata.bo2.pears$empirical.cor)),4)
+res.mat[27,]=round(as.numeric(c(mydata.bo1.spear$bounds[1],mydata.bo1.spear$bounds[2],
+mydata.bo1.spear$desired.cor,mydata.bo1.spear$desired.cor/mydata.bo1.spear$bounds[2],
+mydata.bo1.spear$empirical.cor)),4)
+res.mat[28,]=round(as.numeric(c(mydata.bo2.spear$bounds[1],mydata.bo2.spear$bounds[2],
+mydata.bo2.spear$desired.cor,mydata.bo2.spear$desired.cor/mydata.bo2.spear$bounds[1],
+mydata.bo2.spear$empirical.cor)),4)
+res.mat[29,]=round(as.numeric(c(mydata.po1.pears$bounds[1],mydata.po1.pears$bounds[2],
+mydata.po1.pears$desired.cor,mydata.po1.pears$desired.cor/mydata.po1.pears$bounds[2],
+mydata.po1.pears$empirical.cor)),4)
+res.mat[30,]=round(as.numeric(c(mydata.po2.pears$bounds[1],mydata.po2.pears$bounds[2],
+mydata.po2.pears$desired.cor,mydata.po2.pears$desired.cor/mydata.po2.pears$bounds[1],
+mydata.po2.pears$empirical.cor)),4)
+res.mat[31,]=round(as.numeric(c(mydata.po1.spear$bounds[1],mydata.po1.spear$bounds[2],
+mydata.po1.spear$desired.cor,mydata.po1.spear$desired.cor/mydata.po1.spear$bounds[2],
+mydata.po1.spear$empirical.cor)),4)
+res.mat[32,]=round(as.numeric(c(mydata.po2.spear$bounds[1],mydata.po2.spear$bounds[2],
+mydata.po2.spear$desired.cor,mydata.po2.spear$desired.cor/mydata.po2.spear$bounds[1],
+mydata.po2.spear$empirical.cor)),4)
+res.mat[33,]=round(as.numeric(c(mydata.pp1.pears$bounds[1],mydata.pp1.pears$bounds[2],
+mydata.pp1.pears$desired.cor,mydata.pp1.pears$desired.cor/mydata.pp1.pears$bounds[2],
+mydata.pp1.pears$empirical.cor)),4)
+res.mat[34,]=round(as.numeric(c(mydata.pp2.pears$bounds[1],mydata.pp2.pears$bounds[2],
+mydata.pp2.pears$desired.cor,mydata.pp2.pears$desired.cor/mydata.pp2.pears$bounds[1],
+mydata.pp2.pears$empirical.cor)),4)
+res.mat[35,]=round(as.numeric(c(mydata.pp1.spear$bounds[1],mydata.pp1.spear$bounds[2],
+mydata.pp1.spear$desired.cor,mydata.pp1.spear$desired.cor/mydata.pp1.spear$bounds[2],
+mydata.pp1.spear$empirical.cor)),4)
+res.mat[36,]=round(as.numeric(c(mydata.pp2.spear$bounds[1],mydata.pp2.spear$bounds[2],
+mydata.pp2.spear$desired.cor,mydata.pp2.spear$desired.cor/mydata.pp2.spear$bounds[1],
+mydata.pp2.spear$empirical.cor)),4)
+res.mat[37,]=round(as.numeric(c(mydata.oo1.pears$bounds[1],mydata.oo1.pears$bounds[2],
+mydata.oo1.pears$desired.cor,mydata.oo1.pears$desired.cor/mydata.oo1.pears$bounds[2],
+mydata.oo1.pears$empirical.cor)),4)
+res.mat[38,]=round(as.numeric(c(mydata.oo2.pears$bounds[1],mydata.oo2.pears$bounds[2],
+mydata.oo2.pears$desired.cor,mydata.oo2.pears$desired.cor/mydata.oo2.pears$bounds[1],
+mydata.oo2.pears$empirical.cor)),4)
+res.mat[39,]=round(as.numeric(c(mydata.oo1.spear$bounds[1],mydata.oo1.spear$bounds[2],
+mydata.oo1.spear$desired.cor,mydata.oo1.spear$desired.cor/mydata.oo1.spear$bounds[2],
+mydata.oo1.spear$empirical.cor)),4)
+res.mat[40,]=round(as.numeric(c(mydata.oo2.spear$bounds[1],mydata.oo2.spear$bounds[2],
+mydata.oo2.spear$desired.cor,mydata.oo2.spear$desired.cor/mydata.oo2.spear$bounds[1],
+mydata.oo2.spear$empirical.cor)),4)
+
+> res.mat
+         [,1]   [,2] [,3]   [,4]    [,5]
+ [1,] -0.6999 0.7002  0.5 0.7141  0.5006
+ [2,] -0.6994 0.6997 -0.3 0.4289 -0.2993
+ [3,] -0.6928 0.6928  0.2 0.2887  0.1996
+ [4,] -0.6937 0.6937 -0.6 0.8649 -0.6002
+ [5,] -0.9596 0.9595  0.9 0.9380  0.9001
+ [6,] -0.9594 0.9591 -0.4 0.4169 -0.3983
+ [7,] -0.9753 0.9753  0.1 0.1025  0.0992
+ [8,] -0.9753 0.9753 -0.8 0.8202 -0.7996
+ [9,] -0.9032 0.9026  0.7 0.7755  0.7005
+[10,] -0.9034 0.9033 -0.5 0.5535 -0.5025
+[11,] -1.0000 1.0000  0.1 0.1000  0.1010
+[12,] -1.0000 1.0000 -0.6 0.6000 -0.5992
+[13,] -0.8049 0.4463  0.4 0.8962  0.4001
+[14,] -0.8051 0.4461 -0.3 0.3726 -0.2991
+[15,] -0.6926 0.6926  0.5 0.7219  0.4995
+[16,] -0.6929 0.6929 -0.2 0.2887 -0.2013
+[17,] -0.7824 0.9445  0.9 0.9529  0.8996
+[18,] -0.7834 0.9444 -0.7 0.8936 -0.7002
+[19,] -0.9753 0.9753  0.8 0.8203  0.7991
+[20,] -0.9752 0.9752 -0.5 0.5127 -0.5000
+[21,] -0.7104 0.8975  0.6 0.6685  0.5980
+[22,] -0.7114 0.8979 -0.5 0.7028 -0.5021
+[23,] -0.9488 0.9488  0.3 0.3162  0.2994
+[24,] -0.9487 0.9487 -0.8 0.8433 -0.7994
+[25,] -0.7499 0.4997  0.1 0.2001  0.1009
+[26,] -0.7507 0.5001 -0.4 0.5329 -0.3972
+[27,] -0.6853 0.5493  0.2 0.3641  0.2009
+[28,] -0.6852 0.5477 -0.3 0.4379 -0.2999
+[29,] -0.8311 0.9395  0.7 0.7451  0.7014
+[30,] -0.8323 0.9397 -0.8 0.9612 -0.7999
+[31,] -0.9071 0.9612  0.6 0.6242  0.6002
+[32,] -0.9073 0.9615 -0.9 0.9919 -0.9000
+[33,] -0.8872 0.9994  0.5 0.5003  0.5005
+[34,] -0.8870 0.9992 -0.4 0.4509 -0.4001
+[35,] -0.9469 0.9995  0.9 0.9004  0.8997
+[36,] -0.9468 0.9992 -0.7 0.7394 -0.7009
+[37,] -0.8009 0.9996  0.4 0.4002  0.3987
+[38,] -0.8000 0.9984 -0.2 0.2500 -0.1982
+[39,] -0.8735 0.9994  0.6 0.6004  0.5995
+[40,] -0.8737 0.9996 -0.8 0.9156 -0.8000
+#######################################################
+# Small sample case N=100:  Results are shown in Table 2
+
+#1) P-B
+nsim=1000 ;  norow=100
+set.seed(549)
+mydata.pb1.pears=biv.function(rpois(N,2),sample(c(0,1),N,replace=T,prob=c(0.2,0.8)), 
+desired.cor=0.3, pearson=TRUE,spearman=FALSE)
+mydata.pb2.pears=biv.function(rpois(N,2),sample(c(0,1),N,replace=T,prob=c(0.2,0.8)), 
+desired.cor=-0.5, pearson=TRUE,spearman=FALSE)
+mydata.pb1.spear=biv.function(rpois(N,2),sample(c(0,1),N,replace=T,prob=c(0.2,0.8)), 
+desired.cor=0.2, pearson=FALSE,spearman=TRUE)
+mydata.pb2.spear=biv.function(rpois(N,2),sample(c(0,1),N,replace=T,prob=c(0.2,0.8)), 
+desired.cor=-0.6, pearson=FALSE,spearman=TRUE)
+
+mycor.pb1.pears=numeric() ; mycor.pb2.pears=numeric()
+mycor.pb1.spear=numeric() ; mycor.pb2.spear=numeric()
+
+for (i in 1:nsim){
+w=sample(1:N,norow)
+mycor.pb1.pears[i]=cor(mydata.pb1.pears$new.dat[w,])[1,2]
+mycor.pb2.pears[i]=cor(mydata.pb2.pears$new.dat[w,])[1,2]
+mycor.pb1.spear[i]=cor(mydata.pb1.spear$new.dat[w,],method="spearman")[1,2]
+mycor.pb2.spear[i]=cor(mydata.pb2.spear$new.dat[w,],method="spearman")[1,2]}
+
+print(round(c(mean(mycor.pb1.pears),mean(mycor.pb2.pears),
+mean(mycor.pb1.spear),mean(mycor.pb2.spear)),4))
+#[1]  0.3042 -0.4968  0.2016 -0.5975
+#############################################
+#2) N-O
+mydata.no1.pears=biv.function(rnorm(N),sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=0.8, pearson=TRUE, spearman=FALSE)
+mydata.no2.pears=biv.function(rnorm(N),sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=-0.7, pearson=TRUE, spearman=FALSE)
+mydata.no1.spear=biv.function(rnorm(N),sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=0.6, pearson=FALSE, spearman=TRUE)
+mydata.no2.spear=biv.function(rnorm(N),sample(1:4,N,replace=T,prob=c(0.4,0.3,0.2,0.1)), 
+desired.cor=-0.4, pearson=FALSE, spearman=TRUE)
+
+mycor.no1.pears=numeric() ; mycor.no2.pears=numeric()
+mycor.no1.spear=numeric() ; mycor.no2.spear=numeric()
+
+for (i in 1:nsim){
+w=sample(1:N,norow)
+mycor.no1.pears[i]=cor(mydata.no1.pears$new.dat[w,])[1,2]
+mycor.no2.pears[i]=cor(mydata.no2.pears$new.dat[w,])[1,2]
+mycor.no1.spear[i]=cor(mydata.no1.spear$new.dat[w,],method="spearman")[1,2]
+mycor.no2.spear[i]=cor(mydata.no2.spear$new.dat[w,],method="spearman")[1,2]}
+
+print(round(c(mean(mycor.no1.pears),mean(mycor.no2.pears),
+mean(mycor.no1.spear),mean(mycor.no2.spear)),4))
+#[1]  0.7978 -0.6996  0.5990 -0.3967
+####################################################
+res.mat.small=matrix(0,8,5)
+res.mat.small[1,]=round(as.numeric(c(mydata.pb1.pears$bounds[1],mydata.pb1.pears$bounds[2],
+mydata.pb1.pears$desired.cor,mydata.pb1.pears$desired.cor/mydata.pb1.pears$bounds[2],
+mean(mycor.pb1.pears))),4)
+res.mat.small[2,]=round(as.numeric(c(mydata.pb2.pears$bounds[1],mydata.pb2.pears$bounds[2],
+mydata.pb2.pears$desired.cor,mydata.pb2.pears$desired.cor/mydata.pb2.pears$bounds[1],
+mean(mycor.pb2.pears))),4)
+res.mat.small[3,]=round(as.numeric(c(mydata.pb1.spear$bounds[1],mydata.pb1.spear$bounds[2],
+mydata.pb1.spear$desired.cor,mydata.pb1.spear$desired.cor/mydata.pb1.spear$bounds[2],
+mean(mycor.pb1.spear))),4)
+res.mat.small[4,]=round(as.numeric(c(mydata.pb2.spear$bounds[1],mydata.pb2.spear$bounds[2],
+mydata.pb2.spear$desired.cor,mydata.pb2.spear$desired.cor/mydata.pb2.spear$bounds[1],
+mean(mycor.pb2.spear))),4)
+res.mat.small[5,]=round(as.numeric(c(mydata.no1.pears$bounds[1],mydata.no1.pears$bounds[2],
+mydata.no1.pears$desired.cor,mydata.no1.pears$desired.cor/mydata.no1.pears$bounds[2],
+mean(mycor.no1.pears))),4)
+res.mat.small[6,]=round(as.numeric(c(mydata.no2.pears$bounds[1],mydata.no2.pears$bounds[2],
+mydata.no2.pears$desired.cor,mydata.no2.pears$desired.cor/mydata.no2.pears$bounds[1],
+mean(mycor.no2.pears))),4)
+res.mat.small[7,]=round(as.numeric(c(mydata.no1.spear$bounds[1],mydata.no1.spear$bounds[2],
+mydata.no1.spear$desired.cor,mydata.no1.spear$desired.cor/mydata.no1.spear$bounds[2],
+mean(mycor.no1.spear))),4)
+res.mat.small[8,]=round(as.numeric(c(mydata.no2.spear$bounds[1],mydata.no2.spear$bounds[2],
+mydata.no2.spear$desired.cor,mydata.no2.spear$desired.cor/mydata.no2.spear$bounds[1],
+mean(mycor.no2.spear))),4)
+
+res.mat.small
+        [,1]   [,2] [,3]   [,4]    [,5]
+[1,] -0.7389 0.5924  0.3 0.5064  0.3042
+[2,] -0.7393 0.5929 -0.5 0.6763 -0.4968
+[3,] -0.6800 0.6521  0.2 0.3067  0.2016
+[4,] -0.6793 0.6514 -0.6 0.8833 -0.5975
+[5,] -0.9095 0.9094  0.8 0.8797  0.7978
+[6,] -0.9096 0.9093 -0.7 0.7696 -0.6996
+[7,] -0.9488 0.9488  0.6 0.6324  0.5990
+[8,] -0.9487 0.9487 -0.4 0.4216 -0.3967
+
